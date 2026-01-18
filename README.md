@@ -1,4 +1,8 @@
 # AI-Powered Credit Risk Prediction System (Stacking Ensemble)
+![Streamlit](https://img.shields.io/badge/Streamlit-App-red)
+![Python](https://img.shields.io/badge/Python-3.10-blue)
+![Scikit-learn](https://img.shields.io/badge/Scikit--learn-ML-orange)
+![License](https://img.shields.io/badge/License-MIT-green)
 
 ## Project Overview
 
@@ -118,5 +122,6 @@ In regulated financial industries, it is not enough for a model to be accurate; 
 This is hosted on Streamlit Cloud. You can access the live dashboard using the link below to test predictions on real-time data:
 
 
-**Live App:** [https://share.streamlit.io/your-username/your-repo-name](https://share.streamlit.io/your-username/your-repo-name)
+**Live App:** [Access live dashboard](https://credit-risk-prediction-404.streamlit.app)
+
 
