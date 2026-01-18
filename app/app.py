@@ -11,7 +11,7 @@ st.set_page_config(
 
 def hf_predict(payload: dict) -> float:
     # Ensure this matches your HF URL exactly
-    API_URL = "https://router.huggingface.co/hf-inference/models/gouthamkrishna404/credit-risk-prediction"
+    API_URL = "https://router.huggingface.co/hf-inference/models/gouthamkrishna404/credit-risk-prediction?wait_for_model=true"
     
     headers = {
         "Authorization": f"Bearer {st.secrets['HF_TOKEN']}",
@@ -205,6 +205,7 @@ if st.button("Analyze Risk", use_container_width=True):
 
         for r in reasons:
             st.write(r)
+
 
 
 
