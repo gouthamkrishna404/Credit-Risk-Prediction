@@ -9,7 +9,7 @@ st.set_page_config(
     layout="centered"
 )
 
-HF_API_URL = "https://api-inference.huggingface.co/models/gouthamkrishna404/credit-risk-prediction"
+HF_API_URL = "https://router.huggingface.co/hf-inference/models/gouthamkrishna404/credit-risk-prediction"
 HF_HEADERS = {
     "Authorization": f"Bearer {st.secrets['HF_TOKEN']}",
     "Content-Type": "application/json"
@@ -199,6 +199,7 @@ if st.button("Analyze Risk", use_container_width=True):
 
         for r in reasons:
             st.write(r)
+
 
 
 
