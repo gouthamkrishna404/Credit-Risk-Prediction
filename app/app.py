@@ -30,11 +30,17 @@ main_model, training_data, scaler = load_local_assets()
 def hf_predict(input_df: pd.DataFrame) -> float:
     try:
         scaled_data = scaler.transform(input_df)
-        prediction = main_model.predict_proba(scaled_data)[0][1]
-        
-        return float(prediction)
+        prediction = main_model.predict_proba(scaled_data)
+        if isinstance(prediction, dict):
+            return float(prediction.get("score", 0.0))
+        if isinstance(prediction, list) and isinstance(prediction[0], dict):
+            return float(prediction[0].get("score", 0.0))
+        return float(prediction[0][1])
+
     except Exception as e:
         st.error(f"Logic Error in Prediction: {e}")
+        st.write("Debug - Raw Prediction Type:", type(prediction))
+        st.write("Debug - Raw Prediction Value:", prediction)
         return 0.0
 
 def run_policy_guardrails(inputs):
@@ -140,7 +146,7 @@ if st.button("Analyze Risk", use_container_width=True):
 
     try:
         with st.spinner("Requesting API Prediction..."):
-            prediction_proba = hf_predict(input_df.to_dict(orient="records")[0])
+            prediction_proba = hf_predict(input_df)
     except Exception as e:
         st.error(f"Prediction Error: {e}")
         st.stop()
