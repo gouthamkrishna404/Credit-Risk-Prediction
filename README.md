@@ -1,3 +1,11 @@
+---
+title: Credit Risk Predictor
+emoji: 💳
+sdk: streamlit
+app_file: app/app.py  # <--- THIS IS THE KEY
+pinned: false
+---
+
 # AI-Powered Credit Risk Prediction System (Stacking Ensemble)
 ![Streamlit](https://img.shields.io/badge/Streamlit-App-red)
 ![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Model%20Hub-yellow)
@@ -125,6 +133,7 @@ This is hosted on Streamlit Cloud. You can access the live dashboard using the l
 
 
 **Live App:** [Access live dashboard](https://credit-risk-prediction-404.streamlit.app)
+
 
 
 
