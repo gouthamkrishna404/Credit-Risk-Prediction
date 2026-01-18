@@ -39,9 +39,13 @@ def download_from_hf():
 
 
 
-@st.cache_resource
 def load_artifacts():
     download_from_hf()
+    files = ["credit_risk_model.pkl", "scaler.pkl", "training_columns.pkl"]
+    missing = [f for f in files if not os.path.exists(f"models/{f}")]
+    if missing:
+        st.error(f"Missing files: {missing}")
+        return None, None, None
     try:
         model = joblib.load("models/credit_risk_model.pkl")
         scaler = joblib.load("models/scaler.pkl")
@@ -50,6 +54,7 @@ def load_artifacts():
     except Exception as e:
         st.error(f"Failed to load models: {e}")
         return None, None, None
+
 
 model, scaler, training_columns = load_artifacts()
 
