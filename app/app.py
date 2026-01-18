@@ -12,7 +12,6 @@ st.set_page_config(
 )
 
 HF_REPO_ID = "gouthamkrishna404/credit-risk-prediction" 
-
 def download_from_hf():
     if not os.path.exists("models"):
         os.makedirs("models")
@@ -27,11 +26,16 @@ def download_from_hf():
         dest_path = os.path.join("models", file)
         if not os.path.exists(dest_path):
             try:
-                path = hf_hub_download(repo_id=HF_REPO_ID, filename=f"models/{file}")
+                path = hf_hub_download(
+                    repo_id=HF_REPO_ID, 
+                    filename=f"models/{file}",
+                    token=st.secrets["HF_TOKEN"]
+                )
                 import shutil
                 shutil.copy(path, dest_path)
             except Exception as e:
                 st.error(f"Error downloading {file}: {e}")
+
 
 @st.cache_resource
 def load_artifacts():
