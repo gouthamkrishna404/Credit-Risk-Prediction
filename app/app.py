@@ -3,7 +3,7 @@ import joblib
 import pandas as pd
 import numpy as np
 import os
-import sklearn
+import shutil
 from huggingface_hub import hf_hub_download
 
 st.set_page_config(
@@ -12,29 +12,31 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- DEBUGGING SIDEBAR ---
-with st.sidebar:
-    st.header("🔍 System Audit")
-    st.write(f"**SKLearn Version:** {sklearn.__version__}")
-    st.write(f"**Pandas Version:** {pd.__version__}")
-    debug_mode = st.checkbox("Show Debug Data", value=False)
-
 HF_REPO_ID = "gouthamkrishna404/credit-risk-prediction" 
 
 def download_from_hf():
-    if not os.path.exists("models"):
-        os.makedirs("models")
+    """Downloads artifacts from the 'models/' folder on HF to a local 'models/' folder."""
+    local_dir = "models"
+    if not os.path.exists(local_dir):
+        os.makedirs(local_dir)
     
-    files_to_download = ["credit_risk_model.pkl", "scaler.pkl", "training_columns.pkl"]
+    files_to_download = [
+        "credit_risk_model.pkl",
+        "scaler.pkl",
+        "training_columns.pkl"
+    ]
     
     for file in files_to_download:
-        dest_path = os.path.join("models", file)
+        dest_path = os.path.join(local_dir, file)
+        
         if not os.path.exists(dest_path):
-            with st.spinner(f"Downloading {file}..."):
+            with st.spinner(f"Downloading {file} from Hugging Face models/ folder..."):
                 try:
-                    path = hf_hub_download(repo_id=HF_REPO_ID, filename=file)
-                    import shutil
-                    shutil.copy(path, dest_path)
+                    repo_file_path = f"models/{file}" 
+                    
+                    downloaded_path = hf_hub_download(repo_id=HF_REPO_ID, filename=repo_file_path)
+                    
+                    shutil.copy(downloaded_path, dest_path)
                 except Exception as e:
                     st.error(f"Error downloading {file}: {e}")
 
@@ -53,14 +55,26 @@ def load_artifacts():
 model, scaler, training_columns = load_artifacts()
 
 if model is None:
-    st.error("Model artifacts could not be loaded.")
+    st.error("Model artifacts could not be loaded from Hugging Face.")
     st.stop()
 
+
 def run_policy_guardrails(inputs):
-    if inputs['Age'] < 18: return "REJECT", "Age < 18"
-    if inputs['Age'] > 75: return "REJECT", "Age > 75"
-    if not (300 <= inputs['CreditScore'] <= 850): return "REJECT", "Invalid Credit Score"
-    return "PASS", ""
+    if inputs['Age'] < 18:
+        return "REJECT", "Eligibility Decline: Applicant must be at least 18 years old."
+    if inputs['Age'] > 75:
+        return "REJECT", "Policy Decline: Applicant age exceeds maximum threshold (75)."
+    if not (300 <= inputs['CreditScore'] <= 850):
+        return "REJECT", "Data Error: Credit Score must be between 300 and 850."
+    if inputs['Income'] < 0 or inputs['LoanAmount'] < 0:
+        return "REJECT", "Data Error: Income and Loan Amount must be positive."
+    
+    if inputs['EmploymentType'] == "Unemployed":
+        return "WARN", "High Risk Flag: Applicant is currently unemployed."
+    if inputs['Income'] < 10000:
+        return "WARN", "High Risk Flag: Income is below standard thresholds."
+
+    return "PASS", "Application meets standard policy criteria."
 
 def manual_label_encoder(value, options_list):
     options_list = sorted([str(x) for x in options_list])
@@ -69,25 +83,30 @@ def manual_label_encoder(value, options_list):
     except ValueError:
         return 0 
 
+
 st.title("🏦 Credit Risk Prediction System")
+st.markdown("Enter applicant details below to assess loan default risk.")
 st.divider()
 
 col1, col2 = st.columns(2)
-with col1:
-    age = st.number_input("Age", 18, 100, 30)
-    income = st.number_input("Annual Income ($)", 0, 1000000, 50000)
-    loan = st.number_input("Loan Amount ($)", 0, 1000000, 10000)
-    loan_term = st.number_input("Loan Term (months)", 6, 360, 36)
-    months_employed = st.number_input("Months Employed", 0, 600, 24)
-with col2:
-    credit = st.number_input("Credit Score", 300, 850, 700)
-    dti = st.number_input("DTI Ratio", 0.0, 1.0, 0.3)
-    num_credit_lines = st.number_input("Credit Lines", 0, 50, 3)
-    interest_rate = st.number_input("Interest Rate (%)", 0.0, 40.0, 10.0)
 
+with col1:
+    age = st.number_input("Age", min_value=18, max_value=100, value=30)
+    income = st.number_input("Annual Income ($)", min_value=0, value=50000, step=1000)
+    loan = st.number_input("Loan Amount ($)", min_value=0, value=10000, step=500)
+    loan_term = st.number_input("Loan Term (months)", min_value=6, value=36)
+    months_employed = st.number_input("Months Employed", min_value=0, value=24)
+
+with col2:
+    credit = st.number_input("Credit Score", min_value=300, max_value=850, value=700)
+    dti = st.number_input("DTI Ratio (0.0 - 1.0)", min_value=0.0, max_value=1.0, value=0.30, step=0.01)
+    num_credit_lines = st.number_input("Number of Credit Lines", min_value=0, value=3)
+    interest_rate = st.number_input("Interest Rate (%)", min_value=0.0, max_value=40.0, value=10.0, step=0.1)
+    
 st.divider()
+
 col3, col4 = st.columns(2)
-with col3:
+with col3: 
     edu_opts = ["Bachelor's", "High School", "Master's", "PhD"]
     education = st.selectbox("Education", edu_opts)
     emp_opts = ["Full-time", "Part-time", "Self-employed", "Unemployed"]
@@ -96,6 +115,7 @@ with col3:
     marital = st.selectbox("Marital Status", mar_opts)
     mort_opts = ["No", "Yes"]
     mortgage = st.selectbox("Has Mortgage", mort_opts)
+
 with col4:
     dep_opts = ["No", "Yes"]
     dependents = st.selectbox("Has Dependents", dep_opts)
@@ -104,29 +124,38 @@ with col4:
     co_opts = ["No", "Yes"]
     co_signer = st.selectbox("Has Co-Signer", co_opts)
 
-raw_data = {
-    "Age": age, "Income": income, "LoanAmount": loan, "CreditScore": credit,
-    "MonthsEmployed": months_employed, "NumCreditLines": num_credit_lines,
-    "InterestRate": interest_rate, "LoanTerm": loan_term, "DTIRatio": dti,
-    "Education": education, "EmploymentType": employment, "MaritalStatus": marital, 
-    "HasMortgage": mortgage, "HasDependents": dependents, "LoanPurpose": loan_purpose, 
-    "HasCoSigner": co_signer
-}
 
 if st.button("Analyze Risk", use_container_width=True):
+    raw_data = {
+        "Age": age, "Income": income, "LoanAmount": loan, "CreditScore": credit,
+        "MonthsEmployed": months_employed, "NumCreditLines": num_credit_lines,
+        "InterestRate": interest_rate, "LoanTerm": loan_term, "DTIRatio": dti,
+        "Education": education, "EmploymentType": employment, "MaritalStatus": marital, 
+        "HasMortgage": mortgage, "HasDependents": dependents, "LoanPurpose": loan_purpose, 
+        "HasCoSigner": co_signer
+    }
+    
+    policy_status, policy_msg = run_policy_guardrails(raw_data)
+    
+    if policy_status == "REJECT":
+        st.error(f"🚫 **Automatic Rejection**\n\nReason: {policy_msg}")
+        st.stop()
+    elif policy_status == "WARN":
+        st.warning(f"⚠️ **Policy Warning:** {policy_msg}")
+
     input_df = pd.DataFrame([raw_data])
     
-    # Feature Engineering
+    input_df["Income"] = input_df["Income"].clip(lower=0)
     input_df["Income_Loan_Ratio"] = input_df["Income"] / (input_df["LoanAmount"] + 1)
     input_df["Monthly_Obligation"] = input_df["LoanAmount"] / input_df["LoanTerm"]
     input_df["DTI_Strict"] = (input_df["Monthly_Obligation"] + 500) / (input_df["Income"] / 12 + 1)
     input_df["Tenure_Age_Ratio"] = input_df["MonthsEmployed"] / (input_df["Age"] * 12 + 1)
     input_df["Credit_Income_Interaction"] = input_df["CreditScore"] * np.log1p(input_df["Income"])
     
+    bins = [18, 25, 35, 45, 55, 65, 100]
     labels = ["18-25","26-35","36-45","46-55","56-65","65+"]
-    input_df["Age_Group"] = pd.cut(input_df["Age"], bins=[18, 25, 35, 45, 55, 65, 100], labels=labels)
+    input_df["Age_Group"] = pd.cut(input_df["Age"], bins=bins, labels=labels)
 
-    # Encoding
     input_df["Education"] = manual_label_encoder(education, edu_opts)
     input_df["EmploymentType"] = manual_label_encoder(employment, emp_opts)
     input_df["MaritalStatus"] = manual_label_encoder(marital, mar_opts)
@@ -134,22 +163,25 @@ if st.button("Analyze Risk", use_container_width=True):
     input_df["HasDependents"] = manual_label_encoder(dependents, dep_opts)
     input_df["LoanPurpose"] = manual_label_encoder(loan_purpose, purp_opts)
     input_df["HasCoSigner"] = manual_label_encoder(co_signer, co_opts)
-    input_df["Age_Group"] = manual_label_encoder(str(input_df["Age_Group"].iloc[0]), labels)
+    input_df["Age_Group"] = manual_label_encoder(input_df["Age_Group"].iloc[0], labels)
 
-    # Align with training columns
     input_df = input_df[training_columns]
     input_df_scaled = scaler.transform(input_df)
-
-    # --- DEBUG SECTION ---
-    if debug_mode:
-        st.subheader("🛠 Debugging Output")
-        st.write("**1. Column Order Match:**", list(input_df.columns) == training_columns)
-        st.write("**2. Raw Processed Row:**", input_df)
-        st.write("**3. Scaled Array (First 5 values):**", input_df_scaled[0][:5])
-
     prediction_proba = model.predict_proba(input_df_scaled)[0, 1]
     
-    st.metric(label="Default Probability", value=f"{prediction_proba:.2%}")
-    if prediction_proba < 0.30: st.success("Low Risk")
-    elif prediction_proba > 0.65: st.error("High Risk")
-    else: st.warning("Medium Risk")
+    st.divider()
+    res_col1, res_col2 = st.columns([1, 2])
+    
+    with res_col1:
+        st.metric(label="Default Probability", value=f"{prediction_proba:.2%}")
+        if prediction_proba < 0.30:
+            st.success("## 🟢 Low Risk")
+        elif prediction_proba > 0.65:
+            st.error("## 🔴 High Risk")
+        else:
+            st.warning("## 🟡 Medium Risk")
+
+    with res_col2:
+        st.write("### Analysis Breakdown")
+        st.progress(float(prediction_proba))
+        st.caption(f"0% —— Low (<30%) —— Medium —— High (>65%) —— 100%")
