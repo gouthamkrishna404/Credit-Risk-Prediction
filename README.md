@@ -124,7 +124,8 @@ In regulated financial industries, it is not enough for a model to be accurate; 
 This is hosted on Streamlit Cloud. You can access the live dashboard using the link below to test predictions on real-time data:
 
 
-**Live App:** [Access live dashboard](https://credit-risk-prediction-404.streamlit.app)
+**Live App:** [Access live dashboard](https://huggingface.co/spaces/gouthamkrishna404/credit-risk-prediction)
+
 
 
 
