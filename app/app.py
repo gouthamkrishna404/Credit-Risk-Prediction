@@ -19,15 +19,22 @@ def hf_predict(payload: dict) -> float:
     response = requests.post(
         HF_API_URL,
         headers=HF_HEADERS,
-        json=payload,
+        json={"inputs": payload},
         timeout=60
     )
+    
+    if response.status_code == 503:
+        raise Exception("Model is currently loading on Hugging Face servers. Please retry in 20 seconds.")
+    
     response.raise_for_status()
     result = response.json()
+
+    if isinstance(result, dict) and "default_probability" in result:
+        return float(result["default_probability"])
+    elif isinstance(result, list):
+        return float(result[0][0].get("score", 0.0)) if isinstance(result[0], list) else float(result[0].get("score", 0.0))
     
-    if isinstance(result, list):
-        return result[0][0].get("score", 0.0) if isinstance(result[0], list) else result[0].get("score", 0.0)
-    return result.get("default_probability", 0.0)
+    return 0.0
 
 def run_policy_guardrails(inputs):
     if inputs['Age'] < 18:
@@ -134,7 +141,7 @@ if st.button("Analyze Risk", use_container_width=True):
         with st.spinner("Requesting API Prediction..."):
             prediction_proba = hf_predict(input_df.to_dict(orient="records")[0])
     except Exception as e:
-        st.error(f"API Connection Failed: {e}")
+        st.error(f"Prediction Error: {e}")
         st.stop()
 
     st.divider()
@@ -157,26 +164,26 @@ if st.button("Analyze Risk", use_container_width=True):
         st.progress(float(prediction_proba))
 
         reasons = []
-        if credit < 580: reasons.append("❌ **Credit Profile:** Extremely low score indicates high historical default risk.")
-        elif credit < 670: reasons.append("⚠️ **Credit Profile:** Score is considered 'Fair'; shows moderate risk.")
-        elif credit > 740: reasons.append("✅ **Credit Profile:** Exceptional score demonstrates superior financial discipline.")
+        if credit < 580: reasons.append("❌ **Credit Profile:** Subprime score indicates severe historical risk.")
+        elif credit < 670: reasons.append("⚠️ **Credit Profile:** Score is 'Fair'; suggests moderate risk levels.")
+        elif credit > 740: reasons.append("✅ **Credit Profile:** Exceptional score indicates high financial reliability.")
 
-        if dti > 0.45: reasons.append(f"❌ **Debt Load:** DTI of {dti:.2f} is dangerously high, reducing repayment capacity.")
-        elif dti > 0.35: reasons.append(f"⚠️ **Debt Load:** DTI of {dti:.2f} is slightly elevated for standard products.")
-        else: reasons.append(f"✅ **Debt Load:** DTI is within healthy, manageable limits.")
+        if dti > 0.45: reasons.append(f"❌ **Debt Load:** DTI of {dti:.2f} is dangerously high, limiting repayment capacity.")
+        elif dti > 0.35: reasons.append(f"⚠️ **Debt Load:** DTI of {dti:.2f} is slightly elevated for standard guidelines.")
+        else: reasons.append(f"✅ **Debt Load:** DTI is within healthy and manageable limits.")
 
-        if income < (loan / 2): reasons.append("❌ **Leverage:** Loan amount is very high compared to gross annual income.")
-        elif income > (loan * 3): reasons.append("✅ **Leverage:** Income provides a massive safety buffer for this loan size.")
+        if income < (loan / 2): reasons.append("❌ **Leverage:** Loan amount requested is excessive relative to annual earnings.")
+        elif income > (loan * 3): reasons.append("✅ **Leverage:** Strong income-to-loan ratio provides a significant safety buffer.")
 
-        if months_employed < 12: reasons.append("❌ **Job Stability:** Less than 1 year of employment suggests career volatility.")
-        elif months_employed > 60: reasons.append("✅ **Job Stability:** Long tenure indicates reliable future cash flows.")
+        if months_employed < 12: reasons.append("❌ **Stability:** Short employment tenure suggests potential career volatility.")
+        elif months_employed > 60: reasons.append("✅ **Stability:** Long-term employment indicates highly stable cash flow.")
 
-        if interest_rate > 18: reasons.append("⚠️ **Cost Risk:** High interest rate significantly increases total cost of credit.")
+        if interest_rate > 18: reasons.append("⚠️ **Cost Pressure:** High interest rate significantly increases the total cost of credit.")
+        if num_credit_lines > 12: reasons.append("⚠️ **Credit Velocity:** High number of open accounts may indicate over-extension.")
         
-        if num_credit_lines > 10: reasons.append("⚠️ **Credit Velocity:** High number of credit lines may indicate over-extension.")
-        
-        if input_df["Credit_Income_Interaction"].iloc[0] > 8000:
-            reasons.append("✅ **Financial Strength:** Strong synergy between earning power and credit history.")
+        interaction_val = input_df["Credit_Income_Interaction"].iloc[0]
+        if interaction_val > 8000:
+            reasons.append("✅ **Financial Synergy:** High combination of earning power and credit discipline detected.")
 
         for r in reasons:
             st.write(r)
