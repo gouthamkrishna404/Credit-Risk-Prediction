@@ -90,13 +90,16 @@ A critical component of any financial AI system is the ability to validate its d
 
 In credit risk modeling, a single decision threshold (like 50%) is rarely sufficient for real-world operations. Different economic conditions require different risk appetites. To address this, we analyze the model's performance across three distinct operational strategies. The "Aggressive" threshold (0.30) represents a highly risk-averse strategy, prioritizing capital preservation by rejecting any applicant with even a moderate probability of default; this minimizes bad debt but significantly increases "false alarms," rejecting many good customers. The "Balanced" threshold (0.50) represents the standard mathematical cutoff, which is often suboptimal in finance where the cost of a default far exceeds the profit from a good loan. Finally, the "Optimized" threshold is mathematically derived to maximize the F1-Score, representing the ideal operational "sweet spot" that balances the competing goals of maximizing revenue from good loans while minimizing capital losses from defaults.
 
-**Aggressive Threshold (0.30) - High Safety focus**
+**Aggressive Threshold (0.30) - High Safety focus**  
+
 ![Aggressive Threshold Matrix](outputs/plots/confusion_matrix_30.png)
 
-**Balanced Threshold (0.50) - Standard Cutoff**
+**Balanced Threshold (0.50) - Standard Cutoff**  
+
 ![Balanced Threshold Matrix](outputs/plots/confusion_matrix_50.png)
 
-**Optimized Threshold (F1-Max) - High Acceptance focus**
+**Optimized Threshold (F1-Max) - High Acceptance focus**  
+
 ![Optimized Threshold Matrix](outputs/plots/confusion_matrix_optimized.png)
 
 ### ROC Curve (Receiver Operating Characteristic)
@@ -125,6 +128,7 @@ This is hosted on Streamlit Cloud. You can access the live dashboard using the l
 
 
 **Live App:** [Access live dashboard](https://huggingface.co/spaces/gouthamkrishna404/credit-risk-prediction)
+
 
 
 
