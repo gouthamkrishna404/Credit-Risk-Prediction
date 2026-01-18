@@ -11,7 +11,7 @@ st.set_page_config(
     layout="centered"
 )
 
-HF_REPO_ID = "gouthamkrishna404/credit-risk-prediction" 
+HF_REPO_ID = "gouthamkrishna404/credit-risk-prediction"
 
 def download_from_hf():
     """Downloads artifacts from Hugging Face if they don't exist locally."""
@@ -29,7 +29,7 @@ def download_from_hf():
         if not os.path.exists(dest_path):
             with st.spinner(f"Downloading {file} from Hugging Face..."):
                 try:
-                    path = hf_hub_download(repo_id=HF_REPO_ID, filename=file)
+                    path = hf_hub_download(repo_id=HF_REPO_ID, filename=f"models/{file}")
                     import shutil
                     shutil.copy(path, dest_path)
                 except Exception as e:
@@ -202,3 +202,4 @@ if st.button("Analyze Risk", use_container_width=True):
         
         if input_df["Credit_Income_Interaction"].iloc[0] > 7000:
             st.write("✅ **Income/Credit Synergy:** Strong")
+
