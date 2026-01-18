@@ -115,7 +115,8 @@ In regulated financial industries, it is not enough for a model to be accurate; 
 
 ## Accessing the Application
 
-The trained model is hosted on Streamlit Cloud. You can access the live dashboard using the link below to test predictions on real-time data:
+This is hosted on Streamlit Cloud. You can access the live dashboard using the link below to test predictions on real-time data:
 
 
 **Live App:** [https://share.streamlit.io/your-username/your-repo-name](https://share.streamlit.io/your-username/your-repo-name)
+
