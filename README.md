@@ -3,6 +3,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10-blue)
 ![Scikit-learn](https://img.shields.io/badge/Scikit--learn-ML-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
+![Live Demo](https://img.shields.io/badge/Live-Demo-success)
 
 ## Project Overview
 
@@ -123,5 +124,6 @@ This is hosted on Streamlit Cloud. You can access the live dashboard using the l
 
 
 **Live App:** [Access live dashboard](https://credit-risk-prediction-404.streamlit.app)
+
 
 
