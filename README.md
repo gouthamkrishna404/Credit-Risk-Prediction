@@ -1,5 +1,6 @@
 # AI-Powered Credit Risk Prediction System (Stacking Ensemble)
 ![Streamlit](https://img.shields.io/badge/Streamlit-App-red)
+![Hugging Face](https://img.shields.io/badge/Hugging%20Face-Model%20Hub-yellow)
 ![Python](https://img.shields.io/badge/Python-3.10-blue)
 ![Scikit-learn](https://img.shields.io/badge/Scikit--learn-ML-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -124,6 +125,7 @@ This is hosted on Streamlit Cloud. You can access the live dashboard using the l
 
 
 **Live App:** [Access live dashboard](https://credit-risk-prediction-404.streamlit.app)
+
 
 
 
