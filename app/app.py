@@ -28,7 +28,7 @@ def download_from_hf():
             try:
                 path = hf_hub_download(
                     repo_id=HF_REPO_ID, 
-                    filename=f"models/{file}",
+                    filename=f"{file}",
                     token=st.secrets["HF_TOKEN"]
                 )
                 import shutil
