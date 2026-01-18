@@ -1,66 +1,32 @@
 import streamlit as st
-import joblib
 import pandas as pd
 import numpy as np
-import os
-from huggingface_hub import hf_hub_download
+import requests
 
 st.set_page_config(
-    page_title="Credit Risk Prediction", 
+    page_title="Credit Risk Prediction",
     page_icon="🏦",
     layout="centered"
 )
 
-HF_REPO_ID = "gouthamkrishna404/credit-risk-prediction" 
-def download_from_hf():
-    if not os.path.exists("models"):
-        os.makedirs("models")
-    
-    files_to_download = [
-        "credit_risk_model.pkl",
-        "scaler.pkl",
-        "training_columns.pkl"
-    ]
-    
-    for file in files_to_download:
-        dest_path = os.path.join("models", file)
-        if not os.path.exists(dest_path):
-            try:
-                path = hf_hub_download(
-                    repo_id=HF_REPO_ID,
-                    filename=f"models/{file}",
-                    token=st.secrets["HF_TOKEN"]
-                )
-                import shutil
-                shutil.copy(path, dest_path)
-                st.success(f"Downloaded {file}")
-            except Exception as e:
-                st.error(f"Error downloading {file}: {e}")
+HF_API_URL = "https://api-inference.huggingface.co/models/gouthamkrishna404/credit-risk-prediction"
+HF_HEADERS = {
+    "Authorization": f"Bearer {st.secrets['HF_TOKEN']}",
+    "Content-Type": "application/json"
+}
 
+def hf_predict(payload: dict) -> float:
+    response = requests.post(
+        HF_API_URL,
+        headers=HF_HEADERS,
+        json=payload,
+        timeout=60
+    )
+    response.raise_for_status()
+    result = response.json()
 
+    return result["default_probability"]
 
-def load_artifacts():
-    download_from_hf()
-    files = ["credit_risk_model.pkl", "scaler.pkl", "training_columns.pkl"]
-    missing = [f for f in files if not os.path.exists(f"models/{f}")]
-    if missing:
-        st.error(f"Missing files: {missing}")
-        return None, None, None
-    try:
-        model = joblib.load("models/credit_risk_model.pkl")
-        scaler = joblib.load("models/scaler.pkl")
-        train_cols = joblib.load("models/training_columns.pkl")
-        return model, scaler, train_cols
-    except Exception as e:
-        st.error(f"Failed to load models: {e}")
-        return None, None, None
-
-
-model, scaler, training_columns = load_artifacts()
-
-if model is None:
-    st.error("Model artifacts could not be loaded from Hugging Face.")
-    st.stop()
 
 def run_policy_guardrails(inputs):
     if inputs['Age'] < 18:
@@ -71,7 +37,7 @@ def run_policy_guardrails(inputs):
         return "REJECT", "Data Error: Credit Score must be between 300 and 850."
     if inputs['Income'] < 0 or inputs['LoanAmount'] < 0:
         return "REJECT", "Data Error: Income and Loan Amount must be positive."
-    
+
     if inputs['EmploymentType'] == "Unemployed":
         return "WARN", "High Risk Flag: Applicant is currently unemployed."
     if inputs['Income'] < 10000:
@@ -79,16 +45,17 @@ def run_policy_guardrails(inputs):
 
     return "PASS", "Application meets standard policy criteria."
 
+
 def manual_label_encoder(value, options_list):
     options_list = sorted([str(x) for x in options_list])
     try:
         return options_list.index(str(value))
     except ValueError:
-        return 0 
+        return 0
+
 
 st.title("🏦 Credit Risk Prediction System")
 st.markdown("Enter applicant details below to assess loan default risk.")
-
 st.divider()
 
 col1, col2 = st.columns(2)
@@ -105,11 +72,11 @@ with col2:
     dti = st.number_input("DTI Ratio (0.0 - 1.0)", min_value=0.0, max_value=1.0, value=0.30, step=0.01)
     num_credit_lines = st.number_input("Number of Credit Lines", min_value=0, value=3)
     interest_rate = st.number_input("Interest Rate (%)", min_value=0.0, max_value=40.0, value=10.0, step=0.1)
-    
+
 st.divider()
 
 col3, col4 = st.columns(2)
-with col3: 
+with col3:
     edu_opts = ["Bachelor's", "High School", "Master's", "PhD"]
     education = st.selectbox("Education", edu_opts)
     emp_opts = ["Full-time", "Part-time", "Self-employed", "Unemployed"]
@@ -128,18 +95,28 @@ with col4:
     co_signer = st.selectbox("Has Co-Signer", co_opts)
 
 raw_data = {
-    "Age": age, "Income": income, "LoanAmount": loan, "CreditScore": credit,
-    "MonthsEmployed": months_employed, "NumCreditLines": num_credit_lines,
-    "InterestRate": interest_rate, "LoanTerm": loan_term, "DTIRatio": dti,
-    "Education": education, "EmploymentType": employment, "MaritalStatus": marital, 
-    "HasMortgage": mortgage, "HasDependents": dependents, "LoanPurpose": loan_purpose, 
+    "Age": age,
+    "Income": income,
+    "LoanAmount": loan,
+    "CreditScore": credit,
+    "MonthsEmployed": months_employed,
+    "NumCreditLines": num_credit_lines,
+    "InterestRate": interest_rate,
+    "LoanTerm": loan_term,
+    "DTIRatio": dti,
+    "Education": education,
+    "EmploymentType": employment,
+    "MaritalStatus": marital,
+    "HasMortgage": mortgage,
+    "HasDependents": dependents,
+    "LoanPurpose": loan_purpose,
     "HasCoSigner": co_signer
 }
 
 if st.button("Analyze Risk", use_container_width=True):
-    
+
     policy_status, policy_msg = run_policy_guardrails(raw_data)
-    
+
     if policy_status == "REJECT":
         st.error(f"🚫 **Automatic Rejection**\n\nReason: {policy_msg}")
         st.stop()
@@ -147,16 +124,17 @@ if st.button("Analyze Risk", use_container_width=True):
         st.warning(f"⚠️ **Policy Warning:** {policy_msg}")
 
     input_df = pd.DataFrame([raw_data])
-    
+
     input_df["Income"] = input_df["Income"].clip(lower=0)
     input_df["Income_Loan_Ratio"] = input_df["Income"] / (input_df["LoanAmount"] + 1)
     input_df["Monthly_Obligation"] = input_df["LoanAmount"] / input_df["LoanTerm"]
     input_df["DTI_Strict"] = (input_df["Monthly_Obligation"] + 500) / (input_df["Income"] / 12 + 1)
     input_df["Tenure_Age_Ratio"] = input_df["MonthsEmployed"] / (input_df["Age"] * 12 + 1)
     input_df["Credit_Income_Interaction"] = input_df["CreditScore"] * np.log1p(input_df["Income"])
-    
+
     bins = [18, 25, 35, 45, 55, 65, 100]
     labels = ["18-25","26-35","36-45","46-55","56-65","65+"]
+
     input_df["Age_Group"] = pd.cut(input_df["Age"], bins=bins, labels=labels)
 
     input_df["Education"] = manual_label_encoder(education, edu_opts)
@@ -168,21 +146,17 @@ if st.button("Analyze Risk", use_container_width=True):
     input_df["HasCoSigner"] = manual_label_encoder(co_signer, co_opts)
     input_df["Age_Group"] = manual_label_encoder(input_df["Age_Group"].iloc[0], labels)
 
-    input_df = input_df[training_columns]
-    
-    input_df_scaled = scaler.transform(input_df)
+    prediction_proba = hf_predict(input_df.to_dict(orient="records")[0])
 
-    prediction_proba = model.predict_proba(input_df_scaled)[0, 1]
-    
     THRESH_LOW = 0.30
     THRESH_HIGH = 0.65
-    
+
     st.divider()
     res_col1, res_col2 = st.columns([1, 2])
-    
+
     with res_col1:
         st.metric(label="Default Probability", value=f"{prediction_proba:.2%}")
-        
+
         if prediction_proba < THRESH_LOW:
             st.success("## 🟢 Low Risk")
             st.caption("Auto-Approve")
@@ -196,22 +170,31 @@ if st.button("Analyze Risk", use_container_width=True):
     with res_col2:
         st.write("### Risk Analysis Reasoning")
         st.progress(float(prediction_proba))
-        
+
         reasons = []
-        if credit < 580: reasons.append("❌ **Credit Health:** Score is in the subprime range.")
-        elif credit > 740: reasons.append("✅ **Credit Health:** Score indicates high reliability.")
-        
-        if dti > 0.40: reasons.append(f"❌ **Debt Burden:** DTI of {dti:.2f} suggests high financial strain.")
-        else: reasons.append(f"✅ **Debt Burden:** DTI of {dti:.2f} is within safe limits.")
-        
-        if income < (loan / 3): reasons.append("❌ **Income Ratio:** Annual income is low relative to loan size.")
-        elif income > (loan * 2): reasons.append("✅ **Income Ratio:** Strong earnings cover the loan amount multiple times.")
-        
-        if months_employed < 12: reasons.append("❌ **Stability:** Short employment tenure increases default risk.")
-        elif months_employed > 60: reasons.append("✅ **Stability:** Long-term employment suggests steady cash flow.")
-        
-        if interest_rate > 15: reasons.append(f"⚠️ **Cost of Capital:** High interest ({interest_rate}%) increases repayment difficulty.")
-        
+        if credit < 580:
+            reasons.append("❌ **Credit Health:** Score is in the subprime range.")
+        elif credit > 740:
+            reasons.append("✅ **Credit Health:** Score indicates high reliability.")
+
+        if dti > 0.40:
+            reasons.append(f"❌ **Debt Burden:** DTI of {dti:.2f} suggests high financial strain.")
+        else:
+            reasons.append(f"✅ **Debt Burden:** DTI of {dti:.2f} is within safe limits.")
+
+        if income < (loan / 3):
+            reasons.append("❌ **Income Ratio:** Annual income is low relative to loan size.")
+        elif income > (loan * 2):
+            reasons.append("✅ **Income Ratio:** Strong earnings cover the loan amount multiple times.")
+
+        if months_employed < 12:
+            reasons.append("❌ **Stability:** Short employment tenure increases default risk.")
+        elif months_employed > 60:
+            reasons.append("✅ **Stability:** Long-term employment suggests steady cash flow.")
+
+        if interest_rate > 15:
+            reasons.append(f"⚠️ **Cost of Capital:** High interest ({interest_rate}%) increases repayment difficulty.")
+
         if input_df["Credit_Income_Interaction"].iloc[0] > 7000:
             reasons.append("✅ **Synergy:** High combination of credit score and earning power.")
 
