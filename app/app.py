@@ -11,10 +11,8 @@ st.set_page_config(
     layout="centered"
 )
 
-HF_REPO_ID = "gouthamkrishna404/credit-risk-prediction"
-
+HF_REPO_ID = "gouthamkrishna404/credit-risk-prediction" 
 def download_from_hf():
-    """Downloads artifacts from Hugging Face if they don't exist locally."""
     if not os.path.exists("models"):
         os.makedirs("models")
     
@@ -27,13 +25,19 @@ def download_from_hf():
     for file in files_to_download:
         dest_path = os.path.join("models", file)
         if not os.path.exists(dest_path):
-            with st.spinner(f"Downloading {file} from Hugging Face..."):
-                try:
-                    path = hf_hub_download(repo_id=HF_REPO_ID, filename=f"models/{file}")
-                    import shutil
-                    shutil.copy(path, dest_path)
-                except Exception as e:
-                    st.error(f"Error downloading {file}: {e}")
+            try:
+                path = hf_hub_download(
+                    repo_id=HF_REPO_ID,
+                    filename=f"models/{file}",
+                    token=st.secrets["HF_TOKEN"]
+                )
+                import shutil
+                shutil.copy(path, dest_path)
+                st.success(f"Downloaded {file}")
+            except Exception as e:
+                st.error(f"Error downloading {file}: {e}")
+
+
 
 @st.cache_resource
 def load_artifacts():
@@ -103,23 +107,18 @@ col3, col4 = st.columns(2)
 with col3: 
     edu_opts = ["Bachelor's", "High School", "Master's", "PhD"]
     education = st.selectbox("Education", edu_opts)
-    
     emp_opts = ["Full-time", "Part-time", "Self-employed", "Unemployed"]
     employment = st.selectbox("Employment Type", emp_opts)
-    
     mar_opts = ["Divorced", "Married", "Single"]
     marital = st.selectbox("Marital Status", mar_opts)
-    
     mort_opts = ["No", "Yes"]
     mortgage = st.selectbox("Has Mortgage", mort_opts)
 
 with col4:
     dep_opts = ["No", "Yes"]
     dependents = st.selectbox("Has Dependents", dep_opts)
-    
     purp_opts = ["Auto", "Business", "Education", "Home", "Other"]
     loan_purpose = st.selectbox("Loan Purpose", purp_opts)
-    
     co_opts = ["No", "Yes"]
     co_signer = st.selectbox("Has Co-Signer", co_opts)
 
@@ -190,16 +189,26 @@ if st.button("Analyze Risk", use_container_width=True):
             st.caption("Manual Review Required")
 
     with res_col2:
-        st.write("### Analysis Breakdown")
+        st.write("### Risk Analysis Reasoning")
         st.progress(float(prediction_proba))
-        st.caption(f"0% —— Low (<30%) —— Medium —— High (>65%) —— 100%")
         
-        if credit < 600: st.write("❌ **Credit Score:** Too low")
-        elif credit > 720: st.write("✅ **Credit Score:** Excellent")
+        reasons = []
+        if credit < 580: reasons.append("❌ **Credit Health:** Score is in the subprime range.")
+        elif credit > 740: reasons.append("✅ **Credit Health:** Score indicates high reliability.")
         
-        if dti > 0.45: st.write(f"❌ **Debt Ratio:** High ({dti:.2f})")
-        else: st.write(f"✅ **Debt Ratio:** Healthy ({dti:.2f})")
+        if dti > 0.40: reasons.append(f"❌ **Debt Burden:** DTI of {dti:.2f} suggests high financial strain.")
+        else: reasons.append(f"✅ **Debt Burden:** DTI of {dti:.2f} is within safe limits.")
+        
+        if income < (loan / 3): reasons.append("❌ **Income Ratio:** Annual income is low relative to loan size.")
+        elif income > (loan * 2): reasons.append("✅ **Income Ratio:** Strong earnings cover the loan amount multiple times.")
+        
+        if months_employed < 12: reasons.append("❌ **Stability:** Short employment tenure increases default risk.")
+        elif months_employed > 60: reasons.append("✅ **Stability:** Long-term employment suggests steady cash flow.")
+        
+        if interest_rate > 15: reasons.append(f"⚠️ **Cost of Capital:** High interest ({interest_rate}%) increases repayment difficulty.")
         
         if input_df["Credit_Income_Interaction"].iloc[0] > 7000:
-            st.write("✅ **Income/Credit Synergy:** Strong")
+            reasons.append("✅ **Synergy:** High combination of credit score and earning power.")
 
+        for r in reasons:
+            st.write(r)
