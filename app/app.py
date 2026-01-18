@@ -16,7 +16,7 @@ HF_HEADERS = {
 }
 
 def hf_predict(payload):
-    response = requests.post(API_URL, headers=HEADERS, json=payload)
+    response = requests.post(HF_API_URL, headers=HEADERS, json=payload)
     
     if response.status_code != 200:
         st.error(f"HF status code: {response.status_code}")
@@ -199,4 +199,5 @@ if st.button("Analyze Risk", use_container_width=True):
 
         for r in reasons:
             st.write(r)
+
 
