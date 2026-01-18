@@ -8,17 +8,17 @@ st.set_page_config(
     page_icon="🏦",
     layout="centered"
 )
-
 def hf_predict(payload: dict) -> float:
-    # Ensure this matches your HF URL exactly
-    API_URL = "https://router.huggingface.co/hf-inference/models/gouthamkrishna404/credit-risk-prediction?wait_for_model=true"
+    # Use the /v1 router path for better reliability
+    API_URL = "https://router.huggingface.co/hf-inference/v1/models/gouthamkrishna404/credit-risk-prediction"
     
     headers = {
         "Authorization": f"Bearer {st.secrets['HF_TOKEN']}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "x-wait-for-model": "true" 
     }
     
-    # We use 'inputs' because custom handlers require it
+    # Custom handlers in 2026 strictly expect the 'inputs' key
     response = requests.post(
         API_URL,
         headers=headers,
@@ -27,11 +27,24 @@ def hf_predict(payload: dict) -> float:
     )
     
     if response.status_code != 200:
-        # This will show us the REAL error from HF
-        st.error(f"HF API Error {response.status_code}: {response.text}")
+        # Check if the error is actually because the model is still loading
+        if response.status_code == 503:
+            st.warning("Model is starting up on Hugging Face. Please wait 10 seconds and try again.")
+        else:
+            st.error(f"HF API Error {response.status_code}: {response.text}")
         st.stop()
         
     result = response.json()
+    
+    # The new router returns a list for 'text-classification' tasks
+    # We need to find the specific score from your handler
+    if isinstance(result, list):
+        # Your handler returns {'default_probability': float}
+        # If HF wraps it, it usually looks like result[0]
+        data = result[0]
+        return float(data.get("default_probability", data.get("score", 0.0)))
+    
+    return float(result.get("default_probability", 0.0))
     
     # Extract the probability from your handler.py response
     if isinstance(result, dict):
@@ -205,6 +218,7 @@ if st.button("Analyze Risk", use_container_width=True):
 
         for r in reasons:
             st.write(r)
+
 
 
 
