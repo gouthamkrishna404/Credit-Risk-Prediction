@@ -1,71 +1,41 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import requests
+import joblib
+import os
+from huggingface_hub import hf_hub_download
 
 st.set_page_config(
     page_title="Credit Risk Prediction",
     page_icon="🏦",
     layout="centered"
 )
-def hf_predict(payload: dict) -> float:
-    # Use the /v1 router path for better reliability
-    API_URL = "https://router.huggingface.co/hf-inference/v1/models/gouthamkrishna404/credit-risk-prediction"
+HF_TOKEN = os.getenv("HF_TOKEN")
+@st.cache_resource
+def load_local_assets():
+    REPO_ID = "gouthamkrishna404/credit-risk-prediction"
     
-    headers = {
-        "Authorization": f"Bearer {st.secrets['HF_TOKEN']}",
-        "Content-Type": "application/json",
-        "x-wait-for-model": "true" 
-    }
-    
-    # Custom handlers in 2026 strictly expect the 'inputs' key
-    response = requests.post(
-        API_URL,
-        headers=headers,
-        json={"inputs": payload},
-        timeout=60
-    )
-    
-    if response.status_code != 200:
-        # Check if the error is actually because the model is still loading
-        if response.status_code == 503:
-            st.warning("Model is starting up on Hugging Face. Please wait 10 seconds and try again.")
-        else:
-            st.error(f"HF API Error {response.status_code}: {response.text}")
-        st.stop()
+    with st.spinner("Downloading models from Hub..."):
+        model_path = hf_hub_download(repo_id=REPO_ID, filename="models/credit_risk_model.pkl", token=HF_TOKEN)
+        train_path = hf_hub_download(repo_id=REPO_ID, filename="models/training_columns.pkl", token=HF_TOKEN)
+        scaler_path = hf_hub_download(repo_id=REPO_ID, filename="models/scaler.pkl", token=HF_TOKEN)
         
-    result = response.json()
-    
-    # The new router returns a list for 'text-classification' tasks
-    # We need to find the specific score from your handler
-    if isinstance(result, list):
-        # Your handler returns {'default_probability': float}
-        # If HF wraps it, it usually looks like result[0]
-        data = result[0]
-        return float(data.get("default_probability", data.get("score", 0.0)))
-    
-    return float(result.get("default_probability", 0.0))
-    
-    # Extract the probability from your handler.py response
-    if isinstance(result, dict):
-        return float(result.get("default_probability", 0.0))
-    elif isinstance(result, list):
-        return float(result[0].get("score", 0.0))
+        model = joblib.load(model_path, mmap_mode='r')
+        training_data = joblib.load(train_path, mmap_mode='r')
+        scaler = joblib.load(scaler_path)
         
-    return 0.0
-    
-    if response.status_code == 503:
-        raise Exception("Model is currently loading on Hugging Face servers. Please retry in 20 seconds.")
-    
-    response.raise_for_status()
-    result = response.json()
+    return model, training_data, scaler
+main_model, training_data, scaler = load_local_assets()
 
-    if isinstance(result, dict) and "default_probability" in result:
-        return float(result["default_probability"])
-    elif isinstance(result, list):
-        return float(result[0][0].get("score", 0.0)) if isinstance(result[0], list) else float(result[0].get("score", 0.0))
-    
-    return 0.0
+def hf_predict(input_df: pd.DataFrame) -> float:
+    try:
+        scaled_data = scaler.transform(input_df)
+        prediction = main_model.predict_proba(scaled_data)[0][1]
+        
+        return float(prediction)
+    except Exception as e:
+        st.error(f"Logic Error in Prediction: {e}")
+        return 0.0
 
 def run_policy_guardrails(inputs):
     if inputs['Age'] < 18:
@@ -218,9 +188,3 @@ if st.button("Analyze Risk", use_container_width=True):
 
         for r in reasons:
             st.write(r)
-
-
-
-
-
-
