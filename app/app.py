@@ -9,19 +9,37 @@ st.set_page_config(
     layout="centered"
 )
 
-HF_API_URL = "https://router.huggingface.co/hf-inference/models/gouthamkrishna404/credit-risk-prediction"
-HF_HEADERS = {
-    "Authorization": f"Bearer {st.secrets['HF_TOKEN']}",
-    "Content-Type": "application/json"
-}
-
 def hf_predict(payload: dict) -> float:
+    # Ensure this matches your HF URL exactly
+    API_URL = "https://router.huggingface.co/hf-inference/models/gouthamkrishna404/credit-risk-prediction"
+    
+    headers = {
+        "Authorization": f"Bearer {st.secrets['HF_TOKEN']}",
+        "Content-Type": "application/json"
+    }
+    
+    # We use 'inputs' because custom handlers require it
     response = requests.post(
-        HF_API_URL,
-        headers=HF_HEADERS,
+        API_URL,
+        headers=headers,
         json={"inputs": payload},
         timeout=60
     )
+    
+    if response.status_code != 200:
+        # This will show us the REAL error from HF
+        st.error(f"HF API Error {response.status_code}: {response.text}")
+        st.stop()
+        
+    result = response.json()
+    
+    # Extract the probability from your handler.py response
+    if isinstance(result, dict):
+        return float(result.get("default_probability", 0.0))
+    elif isinstance(result, list):
+        return float(result[0].get("score", 0.0))
+        
+    return 0.0
     
     if response.status_code == 503:
         raise Exception("Model is currently loading on Hugging Face servers. Please retry in 20 seconds.")
@@ -187,6 +205,7 @@ if st.button("Analyze Risk", use_container_width=True):
 
         for r in reasons:
             st.write(r)
+
 
 
 
