@@ -90,7 +90,7 @@ In credit risk modeling, a single decision threshold (like 50%) is rarely suffic
 **Balanced Threshold (0.50) - Standard Cutoff**
 ![Balanced Threshold Matrix](outputs/plots/confusion_matrix_50.png)
 
-**Optimized Threshold (F1-Max) - Profit Maximization focus**
+**Optimized Threshold (F1-Max) - High Acceptance focus**
 ![Optimized Threshold Matrix](outputs/plots/confusion_matrix_optimized.png)
 
 ### ROC Curve (Receiver Operating Characteristic)
@@ -116,5 +116,6 @@ In regulated financial industries, it is not enough for a model to be accurate; 
 ## Accessing the Application
 
 The trained model is hosted on Streamlit Cloud. You can access the live dashboard using the link below to test predictions on real-time data:
+
 
 **Live App:** [https://share.streamlit.io/your-username/your-repo-name](https://share.streamlit.io/your-username/your-repo-name)
