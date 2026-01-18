@@ -15,17 +15,19 @@ HF_HEADERS = {
     "Content-Type": "application/json"
 }
 
-def hf_predict(payload):
-    response = requests.post(HF_API_URL, headers=HF_HEADERS, json=payload)
+def hf_predict(payload: dict) -> float:
+    response = requests.post(
+        HF_API_URL,
+        headers=HF_HEADERS,
+        json=payload,
+        timeout=60
+    )
+    response.raise_for_status()
+    result = response.json()
     
-    if response.status_code != 200:
-        st.error(f"HF status code: {response.status_code}")
-        st.code(response.text)
-        st.stop()
-    
-    return response.json()["default_probability"]
-
-
+    if isinstance(result, list):
+        return result[0][0].get("score", 0.0) if isinstance(result[0], list) else result[0].get("score", 0.0)
+    return result.get("default_probability", 0.0)
 
 def run_policy_guardrails(inputs):
     if inputs['Age'] < 18:
@@ -36,14 +38,11 @@ def run_policy_guardrails(inputs):
         return "REJECT", "Data Error: Credit Score must be between 300 and 850."
     if inputs['Income'] < 0 or inputs['LoanAmount'] < 0:
         return "REJECT", "Data Error: Income and Loan Amount must be positive."
-
     if inputs['EmploymentType'] == "Unemployed":
         return "WARN", "High Risk Flag: Applicant is currently unemployed."
     if inputs['Income'] < 10000:
         return "WARN", "High Risk Flag: Income is below standard thresholds."
-
     return "PASS", "Application meets standard policy criteria."
-
 
 def manual_label_encoder(value, options_list):
     options_list = sorted([str(x) for x in options_list])
@@ -51,7 +50,6 @@ def manual_label_encoder(value, options_list):
         return options_list.index(str(value))
     except ValueError:
         return 0
-
 
 st.title("🏦 Credit Risk Prediction System")
 st.markdown("Enter applicant details below to assess loan default risk.")
@@ -94,26 +92,15 @@ with col4:
     co_signer = st.selectbox("Has Co-Signer", co_opts)
 
 raw_data = {
-    "Age": age,
-    "Income": income,
-    "LoanAmount": loan,
-    "CreditScore": credit,
-    "MonthsEmployed": months_employed,
-    "NumCreditLines": num_credit_lines,
-    "InterestRate": interest_rate,
-    "LoanTerm": loan_term,
-    "DTIRatio": dti,
-    "Education": education,
-    "EmploymentType": employment,
-    "MaritalStatus": marital,
-    "HasMortgage": mortgage,
-    "HasDependents": dependents,
-    "LoanPurpose": loan_purpose,
+    "Age": age, "Income": income, "LoanAmount": loan, "CreditScore": credit,
+    "MonthsEmployed": months_employed, "NumCreditLines": num_credit_lines,
+    "InterestRate": interest_rate, "LoanTerm": loan_term, "DTIRatio": dti,
+    "Education": education, "EmploymentType": employment, "MaritalStatus": marital,
+    "HasMortgage": mortgage, "HasDependents": dependents, "LoanPurpose": loan_purpose,
     "HasCoSigner": co_signer
 }
 
 if st.button("Analyze Risk", use_container_width=True):
-
     policy_status, policy_msg = run_policy_guardrails(raw_data)
 
     if policy_status == "REJECT":
@@ -123,7 +110,6 @@ if st.button("Analyze Risk", use_container_width=True):
         st.warning(f"⚠️ **Policy Warning:** {policy_msg}")
 
     input_df = pd.DataFrame([raw_data])
-
     input_df["Income"] = input_df["Income"].clip(lower=0)
     input_df["Income_Loan_Ratio"] = input_df["Income"] / (input_df["LoanAmount"] + 1)
     input_df["Monthly_Obligation"] = input_df["LoanAmount"] / input_df["LoanTerm"]
@@ -133,7 +119,6 @@ if st.button("Analyze Risk", use_container_width=True):
 
     bins = [18, 25, 35, 45, 55, 65, 100]
     labels = ["18-25","26-35","36-45","46-55","56-65","65+"]
-
     input_df["Age_Group"] = pd.cut(input_df["Age"], bins=bins, labels=labels)
 
     input_df["Education"] = manual_label_encoder(education, edu_opts)
@@ -145,61 +130,53 @@ if st.button("Analyze Risk", use_container_width=True):
     input_df["HasCoSigner"] = manual_label_encoder(co_signer, co_opts)
     input_df["Age_Group"] = manual_label_encoder(input_df["Age_Group"].iloc[0], labels)
 
-    prediction_proba = hf_predict(input_df.to_dict(orient="records")[0])
-
-    THRESH_LOW = 0.30
-    THRESH_HIGH = 0.65
+    try:
+        with st.spinner("Requesting API Prediction..."):
+            prediction_proba = hf_predict(input_df.to_dict(orient="records")[0])
+    except Exception as e:
+        st.error(f"API Connection Failed: {e}")
+        st.stop()
 
     st.divider()
     res_col1, res_col2 = st.columns([1, 2])
 
     with res_col1:
         st.metric(label="Default Probability", value=f"{prediction_proba:.2%}")
-
-        if prediction_proba < THRESH_LOW:
+        if prediction_proba < 0.30:
             st.success("## 🟢 Low Risk")
-            st.caption("Auto-Approve")
-        elif prediction_proba > THRESH_HIGH:
+            st.caption("Strategic Approval")
+        elif prediction_proba > 0.65:
             st.error("## 🔴 High Risk")
-            st.caption("Auto-Reject")
+            st.caption("Decline Recommended")
         else:
             st.warning("## 🟡 Medium Risk")
-            st.caption("Manual Review Required")
+            st.caption("Underwriter Review Needed")
 
     with res_col2:
-        st.write("### Risk Analysis Reasoning")
+        st.write("### Comprehensive Risk Reasoning")
         st.progress(float(prediction_proba))
 
         reasons = []
-        if credit < 580:
-            reasons.append("❌ **Credit Health:** Score is in the subprime range.")
-        elif credit > 740:
-            reasons.append("✅ **Credit Health:** Score indicates high reliability.")
+        if credit < 580: reasons.append("❌ **Credit Profile:** Extremely low score indicates high historical default risk.")
+        elif credit < 670: reasons.append("⚠️ **Credit Profile:** Score is considered 'Fair'; shows moderate risk.")
+        elif credit > 740: reasons.append("✅ **Credit Profile:** Exceptional score demonstrates superior financial discipline.")
 
-        if dti > 0.40:
-            reasons.append(f"❌ **Debt Burden:** DTI of {dti:.2f} suggests high financial strain.")
-        else:
-            reasons.append(f"✅ **Debt Burden:** DTI of {dti:.2f} is within safe limits.")
+        if dti > 0.45: reasons.append(f"❌ **Debt Load:** DTI of {dti:.2f} is dangerously high, reducing repayment capacity.")
+        elif dti > 0.35: reasons.append(f"⚠️ **Debt Load:** DTI of {dti:.2f} is slightly elevated for standard products.")
+        else: reasons.append(f"✅ **Debt Load:** DTI is within healthy, manageable limits.")
 
-        if income < (loan / 3):
-            reasons.append("❌ **Income Ratio:** Annual income is low relative to loan size.")
-        elif income > (loan * 2):
-            reasons.append("✅ **Income Ratio:** Strong earnings cover the loan amount multiple times.")
+        if income < (loan / 2): reasons.append("❌ **Leverage:** Loan amount is very high compared to gross annual income.")
+        elif income > (loan * 3): reasons.append("✅ **Leverage:** Income provides a massive safety buffer for this loan size.")
 
-        if months_employed < 12:
-            reasons.append("❌ **Stability:** Short employment tenure increases default risk.")
-        elif months_employed > 60:
-            reasons.append("✅ **Stability:** Long-term employment suggests steady cash flow.")
+        if months_employed < 12: reasons.append("❌ **Job Stability:** Less than 1 year of employment suggests career volatility.")
+        elif months_employed > 60: reasons.append("✅ **Job Stability:** Long tenure indicates reliable future cash flows.")
 
-        if interest_rate > 15:
-            reasons.append(f"⚠️ **Cost of Capital:** High interest ({interest_rate}%) increases repayment difficulty.")
-
-        if input_df["Credit_Income_Interaction"].iloc[0] > 7000:
-            reasons.append("✅ **Synergy:** High combination of credit score and earning power.")
+        if interest_rate > 18: reasons.append("⚠️ **Cost Risk:** High interest rate significantly increases total cost of credit.")
+        
+        if num_credit_lines > 10: reasons.append("⚠️ **Credit Velocity:** High number of credit lines may indicate over-extension.")
+        
+        if input_df["Credit_Income_Interaction"].iloc[0] > 8000:
+            reasons.append("✅ **Financial Strength:** Strong synergy between earning power and credit history.")
 
         for r in reasons:
             st.write(r)
-
-
-
-
