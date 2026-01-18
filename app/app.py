@@ -3,6 +3,14 @@ import joblib
 import pandas as pd
 import numpy as np
 import os
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, StackingClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from imblearn.over_sampling import SMOTE
+from xgboost import XGBClassifier
+import warnings
+
+warnings.filterwarnings("ignore")
 
 st.set_page_config(
     page_title="Credit Risk Prediction", 
@@ -10,8 +18,89 @@ st.set_page_config(
     layout="centered"
 )
 
+def train_model():
+    if not os.path.exists('models'):
+        os.makedirs('models')
+
+    status_text = st.empty()
+    progress_bar = st.progress(0)
+    
+    status_text.text("Training Phase 1/5: Loading Data...")
+    
+    try:
+        df = pd.read_csv("data/raw_loan_data.csv")
+    except FileNotFoundError:
+        st.error("Fatal Error: 'data/raw_loan_data.csv' not found. Cannot train model.")
+        st.stop()
+
+    if "LoanID" in df.columns:
+        df.drop("LoanID", axis=1, inplace=True)
+
+    status_text.text("Training Phase 2/5: Feature Engineering...")
+    progress_bar.progress(20)
+    
+    df["Income"] = df["Income"].clip(lower=0)
+    df["Income_Loan_Ratio"] = df["Income"] / (df["LoanAmount"] + 1)
+    df["Monthly_Obligation"] = df["LoanAmount"] / df["LoanTerm"]
+    df["DTI_Strict"] = (df["Monthly_Obligation"] + 500) / (df["Income"] / 12 + 1)
+    df["Tenure_Age_Ratio"] = df["MonthsEmployed"] / (df["Age"] * 12 + 1)
+    df["Credit_Income_Interaction"] = df["CreditScore"] * np.log1p(df["Income"])
+
+    bins = [18, 25, 35, 45, 55, 65, 100]
+    labels = ["18-25","26-35","36-45","46-55","56-65","65+"]
+    df["Age_Group"] = pd.cut(df["Age"], bins=bins, labels=labels)
+
+    cat_cols = df.select_dtypes(include=['object', 'category']).columns
+    for col in cat_cols:
+        lbl = LabelEncoder()
+        df[col] = lbl.fit_transform(df[col].astype(str))
+
+    df = df.fillna(0)
+
+    X = df.drop("Default", axis=1)
+    y = df["Default"]
+    
+    training_columns = X.columns.tolist()
+    joblib.dump(training_columns, "models/training_columns.pkl")
+
+    status_text.text("Training Phase 3/5: Balancing Data (SMOTE)...")
+    progress_bar.progress(40)
+    
+    smote = SMOTE(random_state=42)
+    X_resampled, y_resampled = smote.fit_resample(X, y)
+
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X_resampled)
+    joblib.dump(scaler, "models/scaler.pkl")
+
+    status_text.text("Training Phase 4/5: Training Stacking Ensemble...")
+    progress_bar.progress(60)
+
+    base_learners = [
+        ('rf', RandomForestClassifier(n_estimators=50, random_state=42)),
+        ('gb', GradientBoostingClassifier(n_estimators=50, random_state=42)),
+        ('xgb', XGBClassifier(use_label_encoder=False, eval_metric='logloss', n_estimators=50, random_state=42))
+    ]
+    
+    stacking_model = StackingClassifier(
+        estimators=base_learners,
+        final_estimator=LogisticRegression(),
+        cv=3
+    )
+
+    stacking_model.fit(X_scaled, y_resampled)
+    joblib.dump(stacking_model, "models/credit_risk_model.pkl")
+
+    status_text.text("Training Phase 5/5: Complete!")
+    progress_bar.progress(100)
+    status_text.empty()
+    progress_bar.empty()
+
 @st.cache_resource
 def load_artifacts():
+    if not os.path.exists("models/credit_risk_model.pkl"):
+        train_model()
+        
     try:
         model = joblib.load("models/credit_risk_model.pkl")
         scaler = joblib.load("models/scaler.pkl")
@@ -23,7 +112,7 @@ def load_artifacts():
 model, scaler, training_columns = load_artifacts()
 
 if model is None:
-    st.error("Model files not found in 'models/'. Please run the training script first.")
+    st.error("Critical Error: Model could not be trained or loaded.")
     st.stop()
 
 def run_policy_guardrails(inputs):
@@ -135,7 +224,10 @@ if st.button("Analyze Risk", use_container_width=True):
     input_df["HasDependents"] = manual_label_encoder(dependents, dep_opts)
     input_df["LoanPurpose"] = manual_label_encoder(loan_purpose, purp_opts)
     input_df["HasCoSigner"] = manual_label_encoder(co_signer, co_opts)
-    input_df["Age_Group"] = manual_label_encoder(input_df["Age_Group"].iloc[0], labels)
+    
+    age_group_labels = ["18-25","26-35","36-45","46-55","56-65","65+"]
+    current_age_group = str(input_df["Age_Group"].iloc[0])
+    input_df["Age_Group"] = manual_label_encoder(current_age_group, age_group_labels)
 
     input_df = input_df[training_columns]
     
