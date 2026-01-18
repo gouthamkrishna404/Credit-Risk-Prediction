@@ -36,7 +36,7 @@ def train_model():
 
     if "LoanID" in df.columns:
         df.drop("LoanID", axis=1, inplace=True)
-HF_REPO_ID = "gouthamkrishna404/credit-risk-prediction" 
+    HF_REPO_ID = "gouthamkrishna404/credit-risk-prediction" 
 
     status_text.text("Training Phase 2/5: Feature Engineering...")
     progress_bar.progress(20)
@@ -215,3 +215,4 @@ def manual_label_encoder(value, options_list):
             st.caption("Auto-Reject")
         else:
             st.warning("## 🟡 Medium Risk")
+
