@@ -15,17 +15,16 @@ HF_HEADERS = {
     "Content-Type": "application/json"
 }
 
-def hf_predict(payload: dict) -> float:
-    response = requests.post(
-        HF_API_URL,
-        headers=HF_HEADERS,
-        json=payload,
-        timeout=60
-    )
-    response.raise_for_status()
-    result = response.json()
+def hf_predict(payload):
+    response = requests.post(API_URL, headers=HEADERS, json=payload)
+    
+    if response.status_code != 200:
+        st.error(f"HF status code: {response.status_code}")
+        st.code(response.text)
+        st.stop()
+    
+    return response.json()["default_probability"]
 
-    return result["default_probability"]
 
 
 def run_policy_guardrails(inputs):
@@ -200,3 +199,4 @@ if st.button("Analyze Risk", use_container_width=True):
 
         for r in reasons:
             st.write(r)
+
