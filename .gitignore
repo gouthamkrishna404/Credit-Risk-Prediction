@@ -1,0 +1,17 @@
+# Data
+data/cleaned_loan_data.csv
+
+# Models
+models/*.pkl
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+
+# Environment variables
+.env
